@@ -56,7 +56,8 @@ namespace KrisDevelopment
                 _separatorStyle = new GUIStyle("box");
                 _separatorStyle.fontSize = 18;
                 _separatorStyle.fontStyle = FontStyle.Bold;
-                _separatorStyle.alignment = TextAnchor.MiddleCenter;
+				_separatorStyle.normal.textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black;
+				_separatorStyle.alignment = TextAnchor.MiddleCenter;
                 _separatorStyle.stretchWidth = true;
             }
 
