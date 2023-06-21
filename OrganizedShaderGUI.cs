@@ -70,7 +70,9 @@ namespace KrisDevelopment
                     AssetDatabase.OpenAsset(_materialTarget.shader);
                 }
 
-                _search = EditorGUILayout.TextField("Search", _search);
+				GUILayout.BeginHorizontal(EditorStyles.toolbar);
+                _search = EditorGUILayout.TextField("Search", _search, EditorStyles.textField);
+				GUILayout.EndHorizontal();
 
                 GUILayout.Space(5);
             }
@@ -91,6 +93,11 @@ namespace KrisDevelopment
 
             foreach (var _prop in _ungroupedProperties)
             {
+				if(_prop.flags == MaterialProperty.PropFlags.HideInInspector)
+				{
+					continue;
+				}
+
                 Match match = Regex.Match(_prop.displayName, groupConvention);
                 if (match.Success)
                 {
