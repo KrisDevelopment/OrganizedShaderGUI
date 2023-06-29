@@ -74,6 +74,12 @@ namespace KrisDevelopment
                 _search = EditorGUILayout.TextField("Search", _search, EditorStyles.textField);
 				GUILayout.EndHorizontal();
 
+				// draw shader warnings (since when there are errors no GUI is drawn at all)
+				if (ShaderUtil.ShaderHasWarnings(_materialTarget.shader))
+				{
+					EditorGUILayout.HelpBox("Shader generates warnings.", MessageType.Warning);
+				}
+
                 GUILayout.Space(5);
             }
 
@@ -151,7 +157,7 @@ namespace KrisDevelopment
                         if (!string.IsNullOrEmpty(_search) && !_search.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Any(a => _searchable.IndexOf(a, StringComparison.OrdinalIgnoreCase) >= 0))
                             continue;
 
-                        EditorGUI.BeginDisabledGroup(_disabled);
+						EditorGUI.BeginDisabledGroup(_disabled);
                         materialEditor.ShaderProperty(_prop, new GUIContent(_name));
                         EditorGUI.EndDisabledGroup();
                     }
@@ -161,23 +167,26 @@ namespace KrisDevelopment
             }
 
             if (materialEditor.targets.Length == 1)
-            {
-                DrawPasses(materialEditor.target as Material, materialEditor.isVisible);
+			{
+				// inform the user about disabled passes.
+				if (_materialTarget == null || !materialEditor.isVisible)
+				{
+					return;
+				}
+
+				GUILayout.Label("Settings", _separatorStyle);
+				materialEditor.EnableInstancingField();
+				materialEditor.RenderQueueField();
+				DrawPasses(_materialTarget);
             }
         }
 
 
 
 
-        private void DrawPasses(Material material, bool isVisible)
+        private void DrawPasses(Material material)
         {
-            // inform the user about disabled passes.
-            if (material == null || !isVisible)
-            {
-                return;
-            }
-
-            var allPassesDisabled = new ByRef<bool>(true);
+			var allPassesDisabled = new ByRef<bool>(true);
             var passes = new Dictionary<string, (bool enabled, int amount)>();
 
             for (int i = 0; i < material.passCount; i++)
