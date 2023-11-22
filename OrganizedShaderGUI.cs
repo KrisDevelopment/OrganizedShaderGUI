@@ -31,13 +31,15 @@ namespace KrisDevelopment
 
 
 
-        private static string groupConvention = @"\[Group (\S+)\].*"; //match [Group name]
+        private static string _groupConvention = @"\[Group (\S+)\].*"; //match [Group name]
         
-        /// <summary> <see cref="groupConvention"/> </summary>
-        private static string trimGroupConvention = "[Group {0}]"; // what to trim from the property name, should match the regex
+        /// <summary> <see cref="_groupConvention"/> </summary>
+        private static string _trimGroupConvention = "[Group {0}]"; // what to trim from the property name, should match the regex
 
         private GUIStyle _separatorStyle;
         private string _search = string.Empty;
+
+		private Dictionary<string, bool> _foldout = new();
 
 
         public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] properties)
@@ -71,7 +73,9 @@ namespace KrisDevelopment
                 }
 
 				GUILayout.BeginHorizontal(EditorStyles.toolbar);
-                _search = EditorGUILayout.TextField("Search", _search, EditorStyles.textField);
+				GUILayout.Label("Search", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
+				GUILayout.Space(6);
+				_search = EditorGUILayout.TextField(_search, EditorStyles.textField);
 				GUILayout.EndHorizontal();
 
 				// draw shader warnings (since when there are errors no GUI is drawn at all)
@@ -104,7 +108,7 @@ namespace KrisDevelopment
 					continue;
 				}
 
-                Match match = Regex.Match(_prop.displayName, groupConvention);
+                Match match = Regex.Match(_prop.displayName, _groupConvention);
                 if (match.Success)
                 {
                     // group by convention
@@ -122,69 +126,92 @@ namespace KrisDevelopment
 
             // get the current keywords from the material
             foreach (var _propKV in _groupedProperties)
-            {
-                GUILayout.Label(_propKV.Key, _separatorStyle);
-                EditorGUI.indentLevel++;
-                {
-                    foreach (var _prop in _propKV.Value)
-                    {
-                        bool _disabled = false;
-                        switch (_prop.flags)
-                        {
-                            case MaterialProperty.PropFlags.None:
-                                break;
-                            case MaterialProperty.PropFlags.HideInInspector:
-                                continue;
-                            case MaterialProperty.PropFlags.PerRendererData:
-                                break;
-                            case MaterialProperty.PropFlags.NoScaleOffset:
-                                break;
-                            case MaterialProperty.PropFlags.Normal:
-                                break;
-                            case MaterialProperty.PropFlags.HDR:
-                                break;
-                            case MaterialProperty.PropFlags.Gamma:
-                                break;
-                            case MaterialProperty.PropFlags.NonModifiableTextureData:
-                                _disabled = true;
-                                break;
-                        }
-
-                        var _name = _prop.displayName.Replace(string.Format(trimGroupConvention, _propKV.Key), string.Empty);
-                        var _searchable = $"{_name} {_prop.name}";
-
-                        // match a search
-                        if (!string.IsNullOrEmpty(_search) && !_search.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Any(a => _searchable.IndexOf(a, StringComparison.OrdinalIgnoreCase) >= 0))
-                            continue;
-
-						EditorGUI.BeginDisabledGroup(_disabled);
-                        materialEditor.ShaderProperty(_prop, new GUIContent(_name));
-                        EditorGUI.EndDisabledGroup();
-                    }
-                }
-                EditorGUI.indentLevel--;
-                GUILayout.Space(5);
-            }
-
-            if (materialEditor.targets.Length == 1)
 			{
-				// inform the user about disabled passes.
+				bool foldout = GetKey(_propKV);
+				GUILayout.BeginHorizontal();
+				{
+					if (string.IsNullOrEmpty(_search))
+					{
+						foldout = GUILayout.Toggle(foldout, (foldout ? "v" : ">"), _separatorStyle, GUILayout.Width(32));
+					}
+
+					foldout = GUILayout.Toggle(foldout, _propKV.Key, _separatorStyle);
+				}
+				GUILayout.EndHorizontal();
+
+				_foldout[_propKV.Key] = foldout;
+
+				if (GetKey(_propKV) || !string.IsNullOrEmpty(_search))
+				{
+					EditorGUI.indentLevel++;
+					DrawGroup(materialEditor, _propKV.Key, _propKV.Value);
+					EditorGUI.indentLevel--;
+				}
+				
+				GUILayout.Space(5);
+			}
+
+			GUILayout.Label("Settings", _separatorStyle);
+			materialEditor.EnableInstancingField();
+			materialEditor.RenderQueueField();
+
+			if (materialEditor.targets.Length == 1)
+			{
 				if (_materialTarget == null || !materialEditor.isVisible)
 				{
 					return;
 				}
 
-				GUILayout.Label("Settings", _separatorStyle);
-				materialEditor.EnableInstancingField();
-				materialEditor.RenderQueueField();
+				// inform the user about disabled passes.
 				DrawPasses(_materialTarget);
-            }
-        }
+			}
+		}
 
+		private bool GetKey(KeyValuePair<string, List<MaterialProperty>> propKV)
+		{
+			return _foldout.ContainsKey(propKV.Key) ? _foldout[propKV.Key] : true;
+		}
 
+		protected virtual void DrawGroup(MaterialEditor materialEditor, string group, List<MaterialProperty> properties)
+		{
+			foreach (var prop in properties)
+			{
+				bool _disabled = false;
+				switch (prop.flags)
+				{
+					case MaterialProperty.PropFlags.Gamma:
+					case MaterialProperty.PropFlags.HDR:
+					case MaterialProperty.PropFlags.Normal:
+					case MaterialProperty.PropFlags.NoScaleOffset:
+					case MaterialProperty.PropFlags.None:
+						break;
+					case MaterialProperty.PropFlags.HideInInspector:
+						continue;
+					case MaterialProperty.PropFlags.PerRendererData:
+					case MaterialProperty.PropFlags.NonModifiableTextureData:
+						_disabled = true;
+						break;
+				}
 
+				var _name = prop.displayName.Replace(string.Format(_trimGroupConvention, group), string.Empty);
+				var _searchable = $"{_name} {prop.name}";
 
-        private void DrawPasses(Material material)
+				// match a search
+				if (!string.IsNullOrEmpty(_search) && !_search.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Any(a => _searchable.IndexOf(a, StringComparison.OrdinalIgnoreCase) >= 0))
+					continue;
+
+				EditorGUI.BeginDisabledGroup(_disabled);
+				DrawProperty(materialEditor, prop, _name);
+				EditorGUI.EndDisabledGroup();
+			}
+		}
+
+		protected virtual void DrawProperty(MaterialEditor materialEditor, MaterialProperty prop, string name)
+		{
+			materialEditor.ShaderProperty(prop, new GUIContent(name));
+		}
+
+		private void DrawPasses(Material material)
         {
 			var allPassesDisabled = new ByRef<bool>(true);
             var passes = new Dictionary<string, (bool enabled, int amount)>();
