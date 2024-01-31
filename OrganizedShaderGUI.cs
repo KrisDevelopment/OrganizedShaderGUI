@@ -8,43 +8,43 @@ using UnityEngine;
 
 namespace KrisDevelopment
 {
-    public class OrganizedShaderGUI : ShaderGUI
-    {
-        private class ByRef<T>
-        {
-            public T value;
+	public class OrganizedShaderGUI : ShaderGUI
+	{
+		private class ByRef<T>
+		{
+			public T value;
 
-            public ByRef(T @default)
-            {
-                value = @default;
-            }
-        }
+			public ByRef(T @default)
+			{
+				value = @default;
+			}
+		}
 
-        private static string[] commonPassNames = new[] {
-            "ALWAYS",
-            "FORWARD",
-            "FORWARD_DELTA",
-            "DEFERRED",
-            "SHADOWCASTER",
-            "META",
-        };
+		private static string[] commonPassNames = new[] {
+			"ALWAYS",
+			"FORWARD",
+			"FORWARD_DELTA",
+			"DEFERRED",
+			"SHADOWCASTER",
+			"META",
+		};
 
 
 
-        private static string _groupConvention = @"\[Group (\S+)\].*"; //match [Group name]
-        
-        /// <summary> <see cref="_groupConvention"/> </summary>
-        private static string _trimGroupConvention = "[Group {0}]"; // what to trim from the property name, should match the regex
+		private static string _groupConvention = @"\[Group (\S+)\].*"; //match [Group name]
 
-        private GUIStyle _separatorStyle;
-        private string _search = string.Empty;
+		/// <summary> <see cref="_groupConvention"/> </summary>
+		private static string _trimGroupConvention = "[Group {0}]"; // what to trim from the property name, should match the regex
+
+		private GUIStyle _separatorStyle;
+		private string _search = string.Empty;
 
 		private Dictionary<string, bool> _foldout = new();
 
 
-        public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] properties)
-        {
-            /*
+		public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] properties)
+		{
+			/*
              * Init
              * Draw "open shader" option (integrate with Amplify?)
              * Collect groups from property names that follow the convention
@@ -52,80 +52,59 @@ namespace KrisDevelopment
              * Draw some extra info
              */
 
-            // Init
-            if(_separatorStyle == null)
-            {
-                _separatorStyle = new GUIStyle("box");
-                _separatorStyle.fontSize = 18;
-                _separatorStyle.fontStyle = FontStyle.Bold;
+			// Init
+			if (_separatorStyle == null)
+			{
+				_separatorStyle = new GUIStyle("box");
+				_separatorStyle.fontSize = 18;
+				_separatorStyle.fontStyle = FontStyle.Bold;
 				_separatorStyle.normal.textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black;
 				_separatorStyle.alignment = TextAnchor.MiddleCenter;
-                _separatorStyle.stretchWidth = true;
-            }
+				_separatorStyle.stretchWidth = true;
+			}
 
-            // Tools
-            var _materialTarget = materialEditor.target as Material;
-            if (_materialTarget && materialEditor.targets.Length == 1)
-            {
-                if (GUILayout.Button("Open Shader"))
-                {
-                    AssetDatabase.OpenAsset(_materialTarget.shader);
-                }
+			// Tools
+			DrawTools(materialEditor);
 
-				GUILayout.BeginHorizontal(EditorStyles.toolbar);
-				GUILayout.Label("Search", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
-				GUILayout.Space(6);
-				_search = EditorGUILayout.TextField(_search, EditorStyles.textField);
-				GUILayout.EndHorizontal();
+			// Group
 
-				// draw shader warnings (since when there are errors no GUI is drawn at all)
-				if (ShaderUtil.ShaderHasWarnings(_materialTarget.shader))
+			var _ungroupedProperties = new List<MaterialProperty>(properties);
+			var _groupedProperties = new Dictionary<string, List<MaterialProperty>>();
+
+			Action<string, MaterialProperty> _addToGroup = (s, m) =>
+			{
+				if (!_groupedProperties.ContainsKey(s))
 				{
-					EditorGUILayout.HelpBox("Shader generates warnings.", MessageType.Warning);
+					_groupedProperties[s] = new List<MaterialProperty>();
 				}
+				_groupedProperties[s].Add(m);
+			};
 
-                GUILayout.Space(5);
-            }
-
-            // Group
-
-            var _ungroupedProperties = new List<MaterialProperty>(properties);
-            var _groupedProperties = new Dictionary<string, List<MaterialProperty>>();
-
-            Action<string, MaterialProperty> _addToGroup = (s, m) =>
-            {
-                if (!_groupedProperties.ContainsKey(s))
-                {
-                    _groupedProperties[s] = new List<MaterialProperty>();
-                }
-                _groupedProperties[s].Add(m);
-            };
-
-            foreach (var _prop in _ungroupedProperties)
-            {
-				if(_prop.flags == MaterialProperty.PropFlags.HideInInspector)
+			foreach (var _prop in _ungroupedProperties)
+			{
+				if (_prop.flags == MaterialProperty.PropFlags.HideInInspector)
 				{
 					continue;
 				}
 
-                Match match = Regex.Match(_prop.displayName, _groupConvention);
-                if (match.Success)
-                {
-                    // group by convention
-                    string _groupContent = match.Groups[1].Value;
-                    _addToGroup(_groupContent, _prop);
-                }
-                else
-                {
-                    // group by type
-                    _addToGroup($"{_prop.type}s", _prop);
-                }
-            }
+				Match match = Regex.Match(_prop.displayName, _groupConvention);
+				if (match.Success)
+				{
+					// group by convention
+					string _groupContent = match.Groups[1].Value;
+					_addToGroup(_groupContent, _prop);
+				}
+				else
+				{
+					// group by type
+					_addToGroup($"{_prop.type}s", _prop);
+				}
+			}
 
-            // Draw the GUI
+			// Draw the GUI
 
-            // get the current keywords from the material
-            foreach (var _propKV in _groupedProperties)
+			// get the current keywords from the material
+			foreach (var _propKV in _groupedProperties)
 			{
 				bool foldout = GetKey(_propKV);
 				GUILayout.BeginHorizontal();
@@ -147,7 +126,7 @@ namespace KrisDevelopment
 					DrawGroup(materialEditor, _propKV.Key, _propKV.Value);
 					EditorGUI.indentLevel--;
 				}
-				
+
 				GUILayout.Space(5);
 			}
 
@@ -155,6 +134,7 @@ namespace KrisDevelopment
 			materialEditor.EnableInstancingField();
 			materialEditor.RenderQueueField();
 
+			var _materialTarget = materialEditor.target as Material;
 			if (materialEditor.targets.Length == 1)
 			{
 				if (_materialTarget == null || !materialEditor.isVisible)
@@ -164,6 +144,75 @@ namespace KrisDevelopment
 
 				// inform the user about disabled passes.
 				DrawPasses(_materialTarget);
+			}
+		}
+
+		private void DrawTools(MaterialEditor materialEditor)
+		{
+			var _materialTarget = materialEditor.target as Material;
+			if (_materialTarget && materialEditor.targets.Length == 1)
+			{
+				GUILayout.BeginHorizontal();
+				if (GUILayout.Button("Open Shader"))
+				{
+					AssetDatabase.OpenAsset(_materialTarget.shader);
+				}
+
+				// draw copy-paste buttons
+				if (GUILayout.Button("Copy", GUILayout.ExpandWidth(false)))
+				{
+					// store material reference GUID
+
+					EditorGUIUtility.systemCopyBuffer = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(_materialTarget));
+				}
+
+				if (GUILayout.Button("Paste", GUILayout.ExpandWidth(false)))
+				{
+					try
+					{
+						// record undo
+						Undo.RecordObject(_materialTarget, "Paste Material Properties");
+
+						// get material reference GUID
+						var _guid = EditorGUIUtility.systemCopyBuffer;
+
+						var _path = AssetDatabase.GUIDToAssetPath(_guid);
+
+						// check if _guid is a valid GUID and Exists in AssetDatabase
+						if (string.IsNullOrEmpty(_guid) || string.IsNullOrEmpty(_path))
+						{
+							// nothing to paste
+							EditorUtility.DisplayDialog("Paste Material Properties", "No material found in clipboard.", "OK");
+							return;
+						}
+
+						var _materialCopySource = AssetDatabase.LoadAssetAtPath<Material>(_path);
+						_materialTarget.CopyPropertiesFromMaterial(_materialCopySource);
+						EditorUtility.SetDirty(_materialTarget);
+					}
+					catch (Exception e)
+					{
+						Debug.LogException(e);
+						EditorUtility.DisplayDialog("Paste Material Properties", "Failed to paste material properties.", "OK");
+					}
+				}
+
+				GUILayout.EndHorizontal();
+
+				GUILayout.BeginHorizontal(EditorStyles.toolbar);
+				GUILayout.Label("Search", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
+				GUILayout.Space(6);
+				_search = EditorGUILayout.TextField(_search, EditorStyles.textField);
+				GUILayout.EndHorizontal();
+
+				// draw shader warnings (since when there are errors no GUI is drawn at all)
+				if (ShaderUtil.ShaderHasWarnings(_materialTarget.shader))
+				{
+					EditorGUILayout.HelpBox("Shader generates warnings.", MessageType.Warning);
+				}
+
+				GUILayout.Space(5);
+
 			}
 		}
 
@@ -212,65 +261,65 @@ namespace KrisDevelopment
 		}
 
 		private void DrawPasses(Material material)
-        {
+		{
 			var allPassesDisabled = new ByRef<bool>(true);
-            var passes = new Dictionary<string, (bool enabled, int amount)>();
+			var passes = new Dictionary<string, (bool enabled, int amount)>();
 
-            for (int i = 0; i < material.passCount; i++)
-            {
-                AddPass(passes, material, material.GetPassName(i), allPassesDisabled);
-            }
+			for (int i = 0; i < material.passCount; i++)
+			{
+				AddPass(passes, material, material.GetPassName(i), allPassesDisabled);
+			}
 
-            foreach (var pass in commonPassNames)
-            {
-                AddPass(passes, material, pass, allPassesDisabled);
-            }
+			foreach (var pass in commonPassNames)
+			{
+				AddPass(passes, material, pass, allPassesDisabled);
+			}
 
-            GUILayout.BeginVertical("Pass Info", "Window");
-            {
-                foreach (var pass in passes)
-                {
-                    var _clr = GUI.color;
-                    GUI.color = pass.Value.enabled ? Color.white : Color.grey;
-                    {
-                        GUILayout.Label($"PASS {(string.IsNullOrEmpty(pass.Key) ? "-" : pass.Key)} (x{pass.Value.amount}): {pass.Value.enabled}");
-                    }
-                    GUI.color = _clr;
-                }
-            }
-            GUILayout.EndVertical();
+			GUILayout.BeginVertical("Pass Info", "Window");
+			{
+				foreach (var pass in passes)
+				{
+					var _clr = GUI.color;
+					GUI.color = pass.Value.enabled ? Color.white : Color.grey;
+					{
+						GUILayout.Label($"PASS {(string.IsNullOrEmpty(pass.Key) ? "-" : pass.Key)} (x{pass.Value.amount}): {pass.Value.enabled}");
+					}
+					GUI.color = _clr;
+				}
+			}
+			GUILayout.EndVertical();
 
-            if (allPassesDisabled.value)
-            {
-                EditorGUILayout.HelpBox("ALL PASSES DISABLED!", MessageType.Error);
-            }
-        }
+			if (allPassesDisabled.value)
+			{
+				EditorGUILayout.HelpBox("ALL PASSES DISABLED!", MessageType.Error);
+			}
+		}
 
-        private void AddPass(Dictionary<string, (bool enabled, int amount)> passes, Material mat, string passName, ByRef<bool> allPassesDisabled)
-        {
-            var pass = passName.ToUpper();
+		private void AddPass(Dictionary<string, (bool enabled, int amount)> passes, Material mat, string passName, ByRef<bool> allPassesDisabled)
+		{
+			var pass = passName.ToUpper();
 
-            if (mat.FindPass(pass) < 0 && pass != "ALWAYS")
-            {
-                return;
-            }
+			if (mat.FindPass(pass) < 0 && pass != "ALWAYS")
+			{
+				return;
+			}
 
-            bool enabled = mat.GetShaderPassEnabled(pass);
+			bool enabled = mat.GetShaderPassEnabled(pass);
 
-            if (enabled)
-            {
-                allPassesDisabled.value = false;
-            }
+			if (enabled)
+			{
+				allPassesDisabled.value = false;
+			}
 
-            if (!passes.ContainsKey(pass))
-            {
-                passes.Add(pass, (enabled, 1));
-            }
-            else if (!commonPassNames.Contains(pass))
-            {
-                passes[pass] = (enabled, passes[pass].amount + 1);
-            }
-        }
-    }
+			if (!passes.ContainsKey(pass))
+			{
+				passes.Add(pass, (enabled, 1));
+			}
+			else if (!commonPassNames.Contains(pass))
+			{
+				passes[pass] = (enabled, passes[pass].amount + 1);
+			}
+		}
+	}
 }
 #endif
