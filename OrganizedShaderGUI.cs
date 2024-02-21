@@ -106,21 +106,8 @@ namespace KrisDevelopment
 			// get the current keywords from the material
 			foreach (var _propKV in _groupedProperties)
 			{
-				bool foldout = GetKey(_propKV);
-				GUILayout.BeginHorizontal();
-				{
-					if (string.IsNullOrEmpty(_search))
-					{
-						foldout = GUILayout.Toggle(foldout, (foldout ? "v" : ">"), _separatorStyle, GUILayout.Width(32));
-					}
-
-					foldout = GUILayout.Toggle(foldout, _propKV.Key, _separatorStyle);
-				}
-				GUILayout.EndHorizontal();
-
-				_foldout[_propKV.Key] = foldout;
-
-				if (GetKey(_propKV) || !string.IsNullOrEmpty(_search))
+				var _show = GroupSeparator(_propKV.Key);
+				if (_show || !string.IsNullOrEmpty(_search))
 				{
 					EditorGUI.indentLevel++;
 					DrawGroup(materialEditor, _propKV.Key, _propKV.Value);
@@ -130,22 +117,44 @@ namespace KrisDevelopment
 				GUILayout.Space(5);
 			}
 
-			GUILayout.Label("Settings", _separatorStyle);
-			materialEditor.EnableInstancingField();
-			materialEditor.RenderQueueField();
+			DrawFooter(materialEditor);
+		}
 
-			var _materialTarget = materialEditor.target as Material;
-			if (materialEditor.targets.Length == 1)
+		private bool GroupSeparator(string key)
+		{
+			bool _foldout = GetFoldout(key);
+			GUILayout.BeginHorizontal();
 			{
-				if (_materialTarget == null || !materialEditor.isVisible)
-				{
-					return;
-				}
+				_foldout = GUILayout.Toggle(_foldout, (_foldout ? "v" : ">"), _separatorStyle, GUILayout.Width(32));
+				_foldout = GUILayout.Toggle(_foldout, key, _separatorStyle);
+			}
+			GUILayout.EndHorizontal();
+			this._foldout[key] = _foldout;
+			return _foldout;
+		}
 
-				// inform the user about disabled passes.
-				DrawPasses(_materialTarget);
+		private void DrawFooter(MaterialEditor materialEditor)
+		{
+			if (GroupSeparator("Settings"))
+			{
+				materialEditor.EnableInstancingField();
+				materialEditor.RenderQueueField();
+
+				var _materialTarget = materialEditor.target as Material;
+
+				if (materialEditor.targets.Length == 1)
+				{
+					if (_materialTarget == null || !materialEditor.isVisible)
+					{
+						return;
+					}
+
+					// inform the user about disabled passes.
+					DrawPasses(_materialTarget);
+				}
 			}
 		}
+
 
 		private void DrawTools(MaterialEditor materialEditor)
 		{
@@ -216,9 +225,9 @@ namespace KrisDevelopment
 			}
 		}
 
-		private bool GetKey(KeyValuePair<string, List<MaterialProperty>> propKV)
+		private bool GetFoldout(string key)
 		{
-			return _foldout.ContainsKey(propKV.Key) ? _foldout[propKV.Key] : true;
+			return _foldout.ContainsKey(key) ? _foldout[key] : true;
 		}
 
 		protected virtual void DrawGroup(MaterialEditor materialEditor, string group, List<MaterialProperty> properties)
@@ -282,7 +291,13 @@ namespace KrisDevelopment
 					var _clr = GUI.color;
 					GUI.color = pass.Value.enabled ? Color.white : Color.grey;
 					{
-						GUILayout.Label($"PASS {(string.IsNullOrEmpty(pass.Key) ? "-" : pass.Key)} (x{pass.Value.amount}): {pass.Value.enabled}");
+						bool _passEnabled = pass.Value.enabled;
+						bool _passToggleValue = EditorGUILayout.ToggleLeft($"PASS {(string.IsNullOrEmpty(pass.Key) ? "-" : pass.Key)} (x{pass.Value.amount}): {pass.Value.enabled}", _passEnabled);
+						if (_passToggleValue != _passEnabled)
+						{
+							material.SetShaderPassEnabled(pass.Key, _passToggleValue);
+							EditorUtility.SetDirty(material);
+						}
 					}
 					GUI.color = _clr;
 				}
