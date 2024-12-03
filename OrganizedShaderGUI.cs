@@ -38,6 +38,7 @@ namespace KrisDevelopment
 
 		private GUIStyle _separatorStyle;
 		private string _search = string.Empty;
+		private bool _debugInfo = EditorPrefs.GetBool("OrganizedShaderGUI_DebugInfo", false);
 
 		private Dictionary<string, bool> _foldout = new();
 
@@ -151,6 +152,19 @@ namespace KrisDevelopment
 
 					// inform the user about disabled passes.
 					DrawPasses(_materialTarget);
+				}
+				
+				if (GUILayout.Button("Disable META pass"))
+				{
+					_materialTarget.SetShaderPassEnabled("META", false);
+					EditorUtility.SetDirty(_materialTarget);
+				}
+
+				var debugInfo = EditorGUILayout.ToggleLeft(new GUIContent("Debug Info", "Show debugging info such as underlying property names."), _debugInfo);
+				if (debugInfo != _debugInfo)
+				{
+					_debugInfo = debugInfo;
+					EditorPrefs.SetBool("OrganizedShaderGUI_DebugInfo", _debugInfo);
 				}
 			}
 		}
@@ -266,6 +280,10 @@ namespace KrisDevelopment
 
 		protected virtual void DrawProperty(MaterialEditor materialEditor, MaterialProperty prop, string name)
 		{
+			if (_debugInfo)
+			{
+				GUILayout.Label($"[{prop.type}] {prop.name}", EditorStyles.linkLabel);
+			}
 			materialEditor.ShaderProperty(prop, new GUIContent(name));
 		}
 
