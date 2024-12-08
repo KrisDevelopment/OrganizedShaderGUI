@@ -160,12 +160,21 @@ namespace KrisDevelopment
 					EditorUtility.SetDirty(_materialTarget);
 				}
 
-				var debugInfo = EditorGUILayout.ToggleLeft(new GUIContent("Debug Info", "Show debugging info such as underlying property names."), _debugInfo);
-				if (debugInfo != _debugInfo)
+				GUILayout.BeginHorizontal();
 				{
-					_debugInfo = debugInfo;
-					EditorPrefs.SetBool("OrganizedShaderGUI_DebugInfo", _debugInfo);
+					var debugInfo = EditorGUILayout.ToggleLeft(new GUIContent("Debug Info", "Show debugging info such as underlying property names."), _debugInfo);
+					if (debugInfo != _debugInfo)
+					{
+						_debugInfo = debugInfo;
+						EditorPrefs.SetBool("OrganizedShaderGUI_DebugInfo", _debugInfo);
+					}
+
+					if (GUILayout.Button(new GUIContent("Keywords", "Print active material keywords in the console."), GUILayout.ExpandWidth(false)))
+					{
+						ShowKeywords(materialEditor);
+					}
 				}
+				GUILayout.EndHorizontal();
 			}
 		}
 
@@ -352,6 +361,31 @@ namespace KrisDevelopment
 			{
 				passes[pass] = (enabled, passes[pass].amount + 1);
 			}
+		}
+
+
+		private void ShowKeywords(MaterialEditor me)
+		{
+			var _material = me.target as Material;
+			if (_material == null)
+			{
+				Debug.LogWarning("No material selected");
+				return;
+			}
+
+			var _sb = new System.Text.StringBuilder();
+
+			var _keywords = _material.shaderKeywords;
+
+			_sb.AppendLine($"Keywords for {_material.shader.name} - {_keywords.Length}:");
+
+
+			foreach (var _keyword in _keywords)
+			{
+				_sb.AppendLine($"{_keyword}: {_material.IsKeywordEnabled(_keyword)}");
+			}
+
+			Debug.Log(_sb.ToString());
 		}
 	}
 }
